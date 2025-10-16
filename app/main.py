@@ -1,6 +1,3 @@
-"""
-User-Service 主入口文件
-"""
 import uvicorn
 import logging
 from datetime import datetime

@@ -35,86 +35,104 @@ class UserService:
     @staticmethod
     async def register_user_with_password(session: AsyncSession, auth_data: PasswordRegister) -> User:
         """密码注册用户"""
-        # 检查注册必备信息
-        if not auth_data.user_name and not auth_data.email and not auth_data.phone:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="用户名、邮箱或手机号不能为空"
-            )
-        
-        # 验证用户名
-        if auth_data.user_name:
-            if len(auth_data.user_name) < USERNAME_MIN_LENGTH:
+        try:
+            # 检查注册必备信息
+            if not auth_data.user_name and not auth_data.email and not auth_data.phone:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"用户名长度不能少于{USERNAME_MIN_LENGTH}个字符"
+                    detail="用户名、邮箱或手机号不能为空"
                 )
-            if len(auth_data.user_name) > USERNAME_MAX_LENGTH:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"用户名长度不能超过{USERNAME_MAX_LENGTH}个字符"
-                )
-        
-        # 验证邮箱
-        if auth_data.email:
-            if len(auth_data.email) > EMAIL_MAX_LENGTH:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"邮箱长度不能超过{EMAIL_MAX_LENGTH}个字符"
-                )
-        
-        # 验证手机号
-        if auth_data.phone:
-            if len(auth_data.phone) > PHONE_MAX_LENGTH:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"手机号长度不能超过{PHONE_MAX_LENGTH}个字符"
-                )
-        
-        # 验证昵称
-        if auth_data.user_full_name:
-            if len(auth_data.user_full_name) > NICKNAME_MAX_LENGTH:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"昵称长度不能超过{NICKNAME_MAX_LENGTH}个字符"
-                )
-        
-        # 检查密码内容合规要求
-        if not PasswordService.check_password_strength(auth_data.password):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"密码长度至少为{PASSWORD_MIN_LENGTH}位，且包含大小写字母、数字、特殊字符"
-            )
 
-        # 检查用户名是否已存在
-        result = await session.execute(select(User).where(
-            (User.user_name == auth_data.user_name) | 
-            (User.email == auth_data.email) |
-            (User.phone == auth_data.phone)
-        ))
-        existing_user = result.scalar_one_or_none()
+            # 检查用户信息是否可用
+            UserService._is_username_available(auth_data.user_name, auth_data.user_full_name)
+            UserService._is_email_available(auth_data.email)
+            UserService._is_phone_available(auth_data.phone)
+            UserService._is_password_available(auth_data.password)
+
+            # 检查用户信息是否已存在
+            if auth_data.user_name:
+                try:
+                    result = await session.execute(select(User).where(User.user_name == auth_data.user_name))
+                    existing_user = result.scalar_one_or_none()
+                    if existing_user:
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail=f"用户名已存在"
+                        )
+                except Exception as e:
+                    logging.error(f"检查用户名是否存在时出错: {e}")
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail="检查用户名失败"
+                    )
         
-        if existing_user:
+            if auth_data.email:
+                try:
+                    result = await session.execute(select(User).where(User.email == auth_data.email))
+                    existing_user = result.scalar_one_or_none()
+                    if existing_user:
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail=f"邮箱已存在"
+                        )
+                except Exception as e:
+                    logging.error(f"检查邮箱是否存在时出错: {e}")
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail="检查邮箱失败"
+                    )
+            
+            if auth_data.phone:
+                try:
+                    result = await session.execute(select(User).where(User.phone == auth_data.phone))
+                    existing_user = result.scalar_one_or_none()
+                    if existing_user:
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail=f"手机号已存在"
+                        )
+                except Exception as e:
+                    logging.error(f"检查手机号是否存在时出错: {e}")
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail="检查手机号失败"
+                    )
+            
+            # 创建用户
+            try:
+                user = await UserService.create_user_with_default_role(session, {
+                    "user_name": auth_data.user_name,
+                    "email": auth_data.email,
+                    "phone": auth_data.phone,
+                    "hashed_password": PasswordService.hash_password(auth_data.password),
+                    "user_full_name": auth_data.user_full_name
+                }, "password")
+            except Exception as e:
+                logging.error(f"创建用户失败: {e}")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="创建用户失败"
+                )
+            
+            # 发送欢迎邮件
+            if user.email:
+                try:
+                    await EmailService.send_welcome_email(
+                        email=user.email,
+                        username=user.user_name,
+                        language=user.language or "zh-CN"
+                    )
+                except Exception as e:
+                    logging.warning(f"发送欢迎邮件失败: {e}")
+                    # 邮件发送失败不影响用户注册
+        
+        except HTTPException:
+            raise
+        except Exception as e:
+            logging.error(f"注册用户失败: {e}")
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="用户名、邮箱或手机号已存在"
-            )
-        
-        # 创建用户
-        user = await UserService.create_user_with_default_role(session, {
-            "user_name": auth_data.user_name,
-            "email": auth_data.email,
-            "phone": auth_data.phone,
-            "hashed_password": PasswordService.hash_password(auth_data.password),
-            "user_full_name": auth_data.user_full_name
-        }, "password")
-        
-        # 发送欢迎邮件
-        if user.email:
-            await EmailService.send_welcome_email(
-                email=user.email,
-                username=user.user_name,
-                language=user.language or "zh-CN"
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="注册用户失败"
             )
         
         return user
@@ -211,55 +229,85 @@ class UserService:
     @staticmethod
     async def create_user(session: AsyncSession, user_data: dict, registration_method: str) -> User:
         """创建用户（不分配角色）"""
-        
-        user = User(
-            id=str(uuid.uuid4()),
-            user_name=user_data.get("user_name"),
-            email=user_data.get("email", None),
-            phone=user_data.get("phone", None),
-            hashed_password=user_data.get("hashed_password", None),
-            user_full_name=user_data.get("user_full_name", None),
-            avatar=user_data.get("avatar", None),
-            language=user_data.get("language", get_default_language()),  # 使用默认语言
-            is_active=user_data.get("is_active", True),
-            is_superuser=user_data.get("is_superuser", False),
-            email_verified=user_data.get("email_verified", False),
-            phone_verified=user_data.get("phone_verified", False),
-            registration_method=registration_method,
-            github_id=user_data.get("github_id", None),
-            google_id=user_data.get("google_id", None),
-            wechat_id=user_data.get("wechat_id", None),
-            alipay_id=user_data.get("alipay_id", None),
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow()
-        )
-        
-        session.add(user)
-        await session.commit()
-        await session.refresh(user)
-        
-        return user
+        try:
+            user = User(
+                id=str(uuid.uuid4()),
+                user_name=user_data.get("user_name"),
+                email=user_data.get("email", None),
+                phone=user_data.get("phone", None),
+                hashed_password=user_data.get("hashed_password", None),
+                user_full_name=user_data.get("user_full_name", None),
+                avatar=user_data.get("avatar", None),
+                language=user_data.get("language", get_default_language()),  # 使用默认语言
+                is_active=user_data.get("is_active", True),
+                is_superuser=user_data.get("is_superuser", False),
+                email_verified=user_data.get("email_verified", False),
+                phone_verified=user_data.get("phone_verified", False),
+                registration_method=registration_method,
+                github_id=user_data.get("github_id", None),
+                google_id=user_data.get("google_id", None),
+                wechat_id=user_data.get("wechat_id", None),
+                alipay_id=user_data.get("alipay_id", None),
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow()
+            )
+            
+            session.add(user)
+            await session.commit()
+            await session.refresh(user)
+            
+            return user
+        except Exception as e:
+            await session.rollback()
+            logging.error(f"创建用户失败: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="创建用户失败"
+            )
     
     @staticmethod
     async def create_user_with_default_role(session: AsyncSession, user_data: dict, registration_method: str) -> User:
         """创建用户并分配默认角色"""
-        
-        # 创建用户
-        user = await UserService.create_user(session, user_data, registration_method)
-        
-        # 获取或创建默认角色
-        user_role = await RoleService.get_or_create_role(session, "user", "普通用户")
-        
-        # 分配默认角色
-        user_in_role = UserInRole(
-            id=str(uuid.uuid4()),
-            user_id=user.id,
-            role_id=user_role.id
-        )
-        session.add(user_in_role)
-        await session.commit()
-        
-        return user
+        try:
+            # 创建用户
+            user = await UserService.create_user(session, user_data, registration_method)
+            
+            # 获取或创建默认角色
+            try:
+                user_role = await RoleService.get_or_create_role(session, "user", "普通用户")
+            except Exception as e:
+                logging.error(f"获取或创建默认角色失败: {e}")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="获取默认角色失败"
+                )
+            
+            # 分配默认角色
+            try:
+                user_in_role = UserInRole(
+                    id=str(uuid.uuid4()),
+                    user_id=user.id,
+                    role_id=user_role.id
+                )
+                session.add(user_in_role)
+                await session.commit()
+            except Exception as e:
+                await session.rollback()
+                logging.error(f"分配默认角色失败: {e}")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="分配默认角色失败"
+                )
+            
+            return user
+        except HTTPException:
+            raise
+        except Exception as e:
+            logging.error(f"创建用户并分配角色失败: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="创建用户失败"
+            )
     
     @staticmethod
     async def generate_unique_username(session: AsyncSession, base_username: str) -> str:
@@ -572,3 +620,56 @@ class UserService:
         except Exception as e:
             logging.error(f"获取头像URL失败: {e}")
             return None
+
+    @staticmethod
+    def _is_username_available(user_name: str, user_full_name: str) -> bool:
+        # 验证用户名
+        if user_name:
+            if len(user_name) < USERNAME_MIN_LENGTH:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"用户名长度不能少于{USERNAME_MIN_LENGTH}个字符"
+                )
+            
+            if len(user_name) > USERNAME_MAX_LENGTH:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"用户名长度不能超过{USERNAME_MAX_LENGTH}个字符"
+                )
+        
+        # 验证昵称
+        if user_full_name:
+            if len(user_full_name) > NICKNAME_MAX_LENGTH:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"昵称长度不能超过{NICKNAME_MAX_LENGTH}个字符"
+                )
+        return True
+    
+    @staticmethod
+    def _is_email_available(email: str) -> bool:
+        if len(email) > EMAIL_MAX_LENGTH:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"邮箱长度不能超过{EMAIL_MAX_LENGTH}个字符"
+            )        
+        return True
+
+    @staticmethod
+    def _is_phone_available(phone: str) -> bool:
+        if len(phone) > PHONE_MAX_LENGTH:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"手机号长度不能超过{PHONE_MAX_LENGTH}个字符"
+            )    
+        return True
+
+    @staticmethod
+    def _is_password_available(password: str) -> bool:
+        if not PasswordService.check_password_strength(password):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"密码长度至少为{PASSWORD_MIN_LENGTH}位，且包含大小写字母、数字、特殊字符"
+            )
+        return True
+        

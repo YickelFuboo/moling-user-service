@@ -33,6 +33,7 @@ async def register_with_password(
     except HTTPException:
         raise
     except Exception as e:
+        logging.error(f"密码注册失败: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=I18nService.get_error_message("server_error", language)
@@ -56,6 +57,7 @@ async def register_with_sms(
     except HTTPException:
         raise
     except Exception as e:
+        logging.error(f"短信注册失败: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=I18nService.get_error_message("server_error", language)
@@ -79,6 +81,7 @@ async def register_with_email(
     except HTTPException:
         raise
     except Exception as e:
+        logging.error(f"邮箱注册失败: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=I18nService.get_error_message("server_error", language)
@@ -95,6 +98,7 @@ async def get_users(
         result = await UserService.get_users(session, pagination)
         return result
     except Exception as e:
+        logging.error(f"获取用户列表失败: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"获取用户列表失败: {str(e)}"
@@ -124,6 +128,7 @@ async def get_user(
     except HTTPException:
         raise
     except Exception as e:
+        logging.error(f"获取用户详情失败 - 用户ID: {user_id}, 错误: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=I18nService.get_error_message("server_error", language)

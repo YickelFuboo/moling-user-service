@@ -1,7 +1,7 @@
 from typing import Optional
 from sqlalchemy import Column, String, Boolean, Integer, ForeignKey, DateTime
 from sqlalchemy.orm import relationship
-from app.db.database.models.base import Base, TimestampMixin
+from app.models.base import Base, TimestampMixin
 
 
 class User(Base, TimestampMixin):

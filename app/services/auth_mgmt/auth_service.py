@@ -139,25 +139,44 @@ class AuthService:
     @staticmethod
     async def _authenticate_user_by_verification_code(session: AsyncSession, identifier: str, code: str, code_type: str) -> Optional[User]:
         """验证用户（验证码登录）"""
-        # 验证验证码
-        if not await VerifyCodeService.verify_code(identifier, code, code_type):
-            return None
-        
         try:
+            # 验证验证码
+            if not await VerifyCodeService.verify_code(identifier, code, code_type):
+                return None
+            
             # 先尝试通过邮箱查找
-            result = await session.execute(select(User).where(User.email == identifier))
-            user = result.scalar_one_or_none()
-            if user:
-                return user
+            try:
+                result = await session.execute(select(User).where(User.email == identifier))
+                user = result.scalar_one_or_none()
+                if user:
+                    return user
+            except Exception as e:
+                logging.error(f"通过邮箱查找用户失败: {e}")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="用户查找失败"
+                )
             
             # 再尝试通过手机号查找
-            result = await session.execute(select(User).where(User.phone == identifier))
-            user = result.scalar_one_or_none()
-            return user
-            
+            try:
+                result = await session.execute(select(User).where(User.phone == identifier))
+                user = result.scalar_one_or_none()
+                return user
+            except Exception as e:
+                logging.error(f"通过手机号查找用户失败: {e}")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="用户查找失败"
+                )
+                
+        except HTTPException:
+            raise
         except Exception as e:
             logging.error(f"根据标识符获取用户失败: {e}")
-            return None
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="用户验证失败"
+            )
     
     @staticmethod
     async def create_login_response(session: AsyncSession, user: User, client_ip: str = None) -> LoginResponse:

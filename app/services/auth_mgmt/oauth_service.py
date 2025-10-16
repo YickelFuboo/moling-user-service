@@ -11,7 +11,7 @@ import jwt
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import func
-from app.config import settings
+from app.config.settings import settings
 from app.infrastructure.redis.factory import REDIS_CONN
 from app.models.user import User
 from app.services.auth_mgmt.jwt_service import JWTService
