@@ -126,8 +126,6 @@ class UserService:
                     logging.warning(f"发送欢迎邮件失败: {e}")
                     # 邮件发送失败不影响用户注册
         
-        except HTTPException:
-            raise
         except Exception as e:
             logging.error(f"注册用户失败: {e}")
             raise HTTPException(
@@ -300,8 +298,6 @@ class UserService:
                 )
             
             return user
-        except HTTPException:
-            raise
         except Exception as e:
             logging.error(f"创建用户并分配角色失败: {e}")
             raise HTTPException(

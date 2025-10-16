@@ -169,8 +169,6 @@ class AuthService:
                     detail="用户查找失败"
                 )
                 
-        except HTTPException:
-            raise
         except Exception as e:
             logging.error(f"根据标识符获取用户失败: {e}")
             raise HTTPException(
@@ -293,9 +291,8 @@ class AuthService:
                 message="令牌刷新成功"
             )
             
-        except HTTPException:
-            raise
         except Exception as e:
+            logging.error(f"刷新令牌失败: {e}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="刷新令牌失败"

@@ -15,7 +15,6 @@ from app.services.common.i18n_service import I18nService
 
 router = APIRouter()
 
-
 @router.post("/register/password", response_model=BaseResponse)
 async def register_with_password(
     register_data: PasswordRegister,
@@ -30,15 +29,12 @@ async def register_with_password(
             message=I18nService.get_success_message("registration_success", language),
             data={"user_id": user.id, "user_name": user.user_name}
         )
-    except HTTPException:
-        raise
     except Exception as e:
         logging.error(f"密码注册失败: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=I18nService.get_error_message("server_error", language)
         )
-
 
 @router.post("/register/sms", response_model=BaseResponse)
 async def register_with_sms(
@@ -54,15 +50,12 @@ async def register_with_sms(
             message=I18nService.get_success_message("registration_success", language),
             data={"user_id": user.id, "user_name": user.user_name}
         )
-    except HTTPException:
-        raise
     except Exception as e:
         logging.error(f"短信注册失败: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=I18nService.get_error_message("server_error", language)
         )
-
 
 @router.post("/register/email", response_model=BaseResponse)
 async def register_with_email(
@@ -78,8 +71,6 @@ async def register_with_email(
             message=I18nService.get_success_message("registration_success", language),
             data={"user_id": user.id, "user_name": user.user_name}
         )
-    except HTTPException:
-        raise
     except Exception as e:
         logging.error(f"邮箱注册失败: {e}")
         raise HTTPException(
@@ -104,7 +95,6 @@ async def get_users(
             detail=f"获取用户列表失败: {str(e)}"
         )
 
-
 @router.get("/{user_id}", response_model=BaseResponse)
 async def get_user(
     user_id: str,
@@ -125,15 +115,12 @@ async def get_user(
             message=I18nService.get_success_message("user_updated", language),
             data=user
         )
-    except HTTPException:
-        raise
     except Exception as e:
         logging.error(f"获取用户详情失败 - 用户ID: {user_id}, 错误: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=I18nService.get_error_message("server_error", language)
         )
-
 
 @router.put("/{user_id}", response_model=BaseResponse)
 async def update_user(
@@ -156,14 +143,12 @@ async def update_user(
             message=I18nService.get_success_message("user_updated", language),
             data={"user_id": user.id}
         )
-    except HTTPException:
-        raise
     except Exception as e:
+        logging.error(f"更新用户失败 - 用户ID: {user_id}, 错误: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=I18nService.get_error_message("server_error", language)
         )
-
 
 @router.delete("/{user_id}", response_model=BaseResponse)
 async def delete_user(
@@ -184,14 +169,12 @@ async def delete_user(
             success=True,
             message=I18nService.get_success_message("user_deleted", language)
         )
-    except HTTPException:
-        raise
     except Exception as e:
+        logging.error(f"删除用户失败 - 用户ID: {user_id}, 错误: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=I18nService.get_error_message("server_error", language)
         )
-
 
 @router.post("/change-password", response_model=BaseResponse)
 async def change_password(
@@ -217,14 +200,12 @@ async def change_password(
             success=True,
             message=I18nService.get_success_message("password_changed", language)
         )
-    except HTTPException:
-        raise
     except Exception as e:
+        logging.error(f"密码修改失败: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"密码修改失败: {str(e)}"
         )
-
 
 @router.post("/upload-avatar", response_model=BaseResponse)
 async def upload_avatar(
@@ -281,7 +262,6 @@ async def upload_avatar(
             detail=I18nService.get_error_message("server_error", language)
         )
 
-
 @router.get("/{user_id}/avatar", response_model=BaseResponse)
 async def get_user_avatar(
     user_id: str,
@@ -317,8 +297,6 @@ async def get_user_avatar(
             message=I18nService.get_success_message("avatar_get_success", language),
             data={"avatar_url": avatar_url}
         )
-    except HTTPException:
-        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

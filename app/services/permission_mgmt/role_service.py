@@ -269,8 +269,6 @@ class RoleService:
             logging.info(f"为角色 {role.name} 添加了 {len(new_user_ids)} 个用户")
             return True
             
-        except HTTPException:
-            raise
         except Exception as e:
             logging.error(f"为角色添加用户失败: {e}")
             await session.rollback()
